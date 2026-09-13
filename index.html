@@ -50,7 +50,7 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <label class="block text-sm font-medium text-gray-300 mr-2">Data Source (.xlsx)</label>
+                    <label class="block text-sm font-medium text-gray-300 mr-2">Override Data (.xlsx)</label>
                     <input type="file" id="fileUpload" accept=".xlsx, .xls" class="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:font-semibold file:bg-dictYellow file:text-dictBlue hover:file:bg-yellow-500 transition cursor-pointer" />
                 </div>
             </div>
@@ -85,7 +85,7 @@
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div class="card border-l-4 border-dictLightBlue">
                 <h3 class="text-sm font-semibold text-gray-500 uppercase">Total Respondents</h3>
-                <p id="kpiTotal" class="text-3xl font-bold text-gray-800 mt-1">0</p>
+                <p id="kpiTotal" class="text-3xl font-bold text-gray-800 mt-1">Fetching Data...</p>
             </div>
             <div class="card border-l-4 border-green-500">
                 <h3 class="text-sm font-semibold text-gray-500 uppercase">Highly Satisfied Learners</h3>
@@ -196,7 +196,7 @@
             <div id="tab-qualitative" class="tab-content hidden">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-semibold text-gray-700">Learner Feedback Database</h3>
-                    <p class="text-sm text-gray-500">Showing top 100 recent entries matching active filters.</p>
+                    <p class="text-sm text-gray-500">Showing top 100 entries matching active filters.</p>
                 </div>
                 <div class="table-container overflow-x-auto border border-gray-200 rounded-lg max-h-[600px] overflow-y-auto">
                     <table class="min-w-full divide-y divide-gray-200 relative">
@@ -237,7 +237,30 @@
             "Strongly disagree": "#dc2626"
         };
 
-        // File Upload Handler
+        // --- AUTO-FETCH DATA ON LOAD ---
+        window.onload = async function() {
+            try {
+                // Adjust the filename to match exactly what is in your repo
+                const response = await fetch('DICT_CoursesEvaluationSurvey_MockDataset.xlsx');
+                if (!response.ok) throw new Error('Network response was not ok');
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, {type: 'array', cellDates: true});
+                
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                rawData = XLSX.utils.sheet_to_json(worksheet);
+                filteredData = [...rawData];
+                
+                populateFilterDropdowns();
+                applyFilters();
+            } catch (error) {
+                console.error("Error loading default dataset:", error);
+                document.getElementById('kpiTotal').innerText = "Error Loading Data";
+            }
+        };
+
+        // File Upload Handler (Manual Override)
         document.getElementById('fileUpload').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -440,7 +463,7 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    indexAxis: 'y', // Horizontal bars are much easier to read for surveys
+                    indexAxis: 'y', 
                     scales: {
                         x: { stacked: true },
                         y: { stacked: true }
