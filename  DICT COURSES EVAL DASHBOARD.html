@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project EmpowerPH - DICT Analytics</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dictBlue: '#0f172a',    
+                        dictLightBlue: '#1e3a8a', 
+                        dictYellow: '#facc15'   
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        .tab-btn.active { border-bottom: 4px solid #facc15; color: #facc15; font-weight: bold; }
+        .hidden { display: none !important; }
+        .card { background: white; border-radius: 0.5rem; padding: 1.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+        
+        .table-container::-webkit-scrollbar { height: 8px; width: 8px; }
+        .table-container::-webkit-scrollbar-track { background: #f1f1f1; }
+        .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .table-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Top Navbar -->
+    <nav class="bg-dictBlue text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <div class="flex items-center gap-4">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/a/aa/DICT-Logo-icon_only.png" alt="DICT Logo" class="w-14 h-14 object-contain bg-white rounded-full p-1 shadow-sm" />
+                    <div>
+                        <h1 class="text-2xl font-bold tracking-wide">Project EmpowerPH (H1 2026)</h1>
+                        <p class="text-sm text-gray-300">Mid-Year Digital Competency Rollout - Evaluation Dashboard</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <label class="block text-sm font-medium text-gray-300 mr-2">Data Source (.xlsx)</label>
+                    <input type="file" id="fileUpload" accept=".xlsx, .xls" class="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:font-semibold file:bg-dictYellow file:text-dictBlue hover:file:bg-yellow-500 transition cursor-pointer" />
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Interactive Filter Bar -->
+    <div class="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center gap-6">
+            <span class="font-semibold text-gray-700">Global Filters:</span>
+            
+            <select id="filterCourse" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-dictLightBlue focus:border-dictLightBlue block p-2.5 min-w-[250px]" onchange="applyFilters()">
+                <option value="All">All Course Tracks</option>
+            </select>
+
+            <select id="filterSector" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-dictLightBlue focus:border-dictLightBlue block p-2.5 min-w-[200px]" onchange="applyFilters()">
+                <option value="All">All Employment Sectors</option>
+            </select>
+
+            <select id="filterRegion" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-dictLightBlue focus:border-dictLightBlue block p-2.5 min-w-[200px]" onchange="applyFilters()">
+                <option value="All">All Regions</option>
+            </select>
+
+            <button onclick="resetFilters()" class="text-sm text-dictLightBlue hover:underline font-medium">Reset Filters</button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <!-- Top KPIs -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="card border-l-4 border-dictLightBlue">
+                <h3 class="text-sm font-semibold text-gray-500 uppercase">Total Respondents</h3>
+                <p id="kpiTotal" class="text-3xl font-bold text-gray-800 mt-1">0</p>
+            </div>
+            <div class="card border-l-4 border-green-500">
+                <h3 class="text-sm font-semibold text-gray-500 uppercase">Highly Satisfied Learners</h3>
+                <p id="kpiSat" class="text-3xl font-bold text-gray-800 mt-1">0%</p>
+            </div>
+            <div class="card border-l-4 border-purple-500">
+                <h3 class="text-sm font-semibold text-gray-500 uppercase">Primary Learning Device</h3>
+                <p id="kpiDevice" class="text-xl font-bold text-gray-800 mt-2">-</p>
+            </div>
+            <div class="card border-l-4 border-dictYellow">
+                <h3 class="text-sm font-semibold text-gray-500 uppercase">Experienced Tech Issues</h3>
+                <p id="kpiIssues" class="text-3xl font-bold text-gray-800 mt-1">0%</p>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="bg-dictLightBlue rounded-t-lg px-2 pt-2 flex space-x-2 overflow-x-auto">
+            <button class="tab-btn active px-6 py-3 text-sm font-medium text-white hover:text-dictYellow transition" onclick="switchTab('tab-overview')">Executive Overview</button>
+            <button class="tab-btn px-6 py-3 text-sm font-medium text-gray-300 hover:text-dictYellow transition" onclick="switchTab('tab-demographics')">Demographics</button>
+            <button class="tab-btn px-6 py-3 text-sm font-medium text-gray-300 hover:text-dictYellow transition" onclick="switchTab('tab-metrics')">Evaluation & Metrics</button>
+            <button class="tab-btn px-6 py-3 text-sm font-medium text-gray-300 hover:text-dictYellow transition" onclick="switchTab('tab-qualitative')">Qualitative Feedback</button>
+        </div>
+
+        <!-- Tab Content Containers -->
+        <div class="bg-white p-6 rounded-b-lg shadow-md min-h-[500px]">
+            
+            <!-- Tab 1: Overview -->
+            <div id="tab-overview" class="tab-content block">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="card lg:col-span-2">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Completion Volume (Jan - Jun 2026 Trend)</h3>
+                        <div class="relative h-72">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-2">Overall Program Satisfaction</h3>
+                        <p class="text-xs text-gray-500 mb-4">"I am highly satisfied with the knowledge I gained from this course."</p>
+                        <div class="relative h-64">
+                            <canvas id="satisfactionChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card lg:col-span-3">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Total Enrollment by Course Track</h3>
+                        <div class="relative h-80">
+                            <canvas id="courseChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Demographics -->
+            <div id="tab-demographics" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Learners by Employment Sector</h3>
+                        <div class="relative h-80">
+                            <canvas id="sectorChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Learners by Sex</h3>
+                        <div class="relative h-80">
+                            <canvas id="sexChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card lg:col-span-2">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Geographic Distribution (Regions)</h3>
+                        <div class="relative h-96">
+                            <canvas id="regionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Metrics & Evaluation Ratings -->
+            <div id="tab-metrics" class="tab-content hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <!-- Massive Rating Matrix -->
+                    <div class="card md:col-span-2">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-2">Course Evaluation Metrics (Likert Scale Breakdown)</h3>
+                        <p class="text-sm text-gray-500 mb-4">Aggregated respondent agreement to specific usability, relevance, and clarity statements.</p>
+                        <div class="relative h-96">
+                            <canvas id="likertMatrixChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-2">Primary Hardware Used</h3>
+                        <p class="text-xs text-gray-500 mb-4">What device did learners use to access the portal?</p>
+                        <div class="relative h-72">
+                            <canvas id="deviceChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-2">Time Invested per Learner</h3>
+                        <p class="text-xs text-gray-500 mb-4">Total estimated hours spent completing the asynchronous modules.</p>
+                        <div class="relative h-72">
+                            <canvas id="hoursChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: Qualitative Feedback (Table) -->
+            <div id="tab-qualitative" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-700">Learner Feedback Database</h3>
+                    <p class="text-sm text-gray-500">Showing top 100 recent entries matching active filters.</p>
+                </div>
+                <div class="table-container overflow-x-auto border border-gray-200 rounded-lg max-h-[600px] overflow-y-auto">
+                    <table class="min-w-full divide-y divide-gray-200 relative">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Sector & Region</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">Course Track</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4 bg-gray-50">Reported Challenge</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4 bg-gray-50">Proposed Suggestion</th>
+                            </tr>
+                        </thead>
+                        <tbody id="qualitativeTableBody" class="bg-white divide-y divide-gray-200 text-sm">
+                            <!-- Rows injected via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // Global State
+        let rawData = [];
+        let filteredData = [];
+        let chartInstances = {};
+        let currentTab = 'tab-overview';
+
+        // DICT Brand Colors for Charts
+        const colors = ['#1e3a8a', '#facc15', '#0ea5e9', '#64748b', '#22c55e', '#a855f7', '#f43f5e', '#f97316', '#14b8a6', '#0f172a', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#06b6d4', '#eab308', '#ec4899'];
+        
+        // Semantic colors for Likert Scales
+        const likertColors = {
+            "Strongly agree": "#16a34a",
+            "Agree": "#4ade80",
+            "Neutral": "#94a3b8",
+            "Disagree": "#f87171",
+            "Strongly disagree": "#dc2626"
+        };
+
+        // File Upload Handler
+        document.getElementById('fileUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array', cellDates: true});
+                
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                rawData = XLSX.utils.sheet_to_json(worksheet);
+                filteredData = [...rawData];
+                
+                populateFilterDropdowns();
+                applyFilters();
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // Tab Switching Logic
+        function switchTab(tabId) {
+            currentTab = tabId;
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('active', 'text-white', 'border-bottom');
+                el.classList.add('text-gray-300');
+            });
+            
+            document.getElementById(tabId).classList.remove('hidden');
+            const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => btn.getAttribute('onclick').includes(tabId));
+            activeBtn.classList.remove('text-gray-300');
+            activeBtn.classList.add('active', 'text-white');
+
+            renderCharts(); 
+        }
+
+        // Dropdown Population
+        function populateFilterDropdowns() {
+            const courses = [...new Set(rawData.map(item => item.Course_Track))].filter(Boolean).sort();
+            const sectors = [...new Set(rawData.map(item => item.Employment_Sector))].filter(Boolean).sort();
+            const regions = [...new Set(rawData.map(item => item.Region))].filter(Boolean).sort();
+
+            const populate = (id, arr, defaultText) => {
+                const select = document.getElementById(id);
+                select.innerHTML = `<option value="All">${defaultText}</option>` + 
+                                   arr.map(val => `<option value="${val}">${val}</option>`).join('');
+            };
+
+            populate('filterCourse', courses, 'All Course Tracks');
+            populate('filterSector', sectors, 'All Employment Sectors');
+            populate('filterRegion', regions, 'All Regions');
+        }
+
+        function resetFilters() {
+            document.getElementById('filterCourse').value = 'All';
+            document.getElementById('filterSector').value = 'All';
+            document.getElementById('filterRegion').value = 'All';
+            applyFilters();
+        }
+
+        // Apply Filters & Trigger Render
+        function applyFilters() {
+            const cFilter = document.getElementById('filterCourse').value;
+            const sFilter = document.getElementById('filterSector').value;
+            const rFilter = document.getElementById('filterRegion').value;
+
+            filteredData = rawData.filter(row => {
+                return (cFilter === 'All' || row.Course_Track === cFilter) &&
+                       (sFilter === 'All' || row.Employment_Sector === sFilter) &&
+                       (rFilter === 'All' || row.Region === rFilter);
+            });
+
+            updateKPIs();
+            renderCharts();
+            renderTable();
+        }
+
+        // Calculate and Update KPI Cards
+        function updateKPIs() {
+            const total = filteredData.length;
+            document.getElementById('kpiTotal').innerText = total.toLocaleString();
+
+            if(total === 0) {
+                document.getElementById('kpiSat').innerText = "0%";
+                document.getElementById('kpiDevice').innerText = "-";
+                document.getElementById('kpiIssues').innerText = "0%";
+                return;
+            }
+
+            const satisfied = filteredData.filter(r => r.Rating_Overall_Satisfaction === 'Strongly agree' || r.Rating_Overall_Satisfaction === 'Agree').length;
+            document.getElementById('kpiSat').innerText = ((satisfied / total) * 100).toFixed(1) + '%';
+
+            const issues = filteredData.filter(r => r.Encountered_Tech_Issues === 'Yes').length;
+            document.getElementById('kpiIssues').innerText = ((issues / total) * 100).toFixed(1) + '%';
+
+            const countBy = (arr, key) => arr.reduce((acc, obj) => { if(obj[key]) acc[obj[key]] = (acc[obj[key]] || 0) + 1; return acc; }, {});
+            const deviceCounts = countBy(filteredData, 'Primary_Learning_Device');
+            const topDevice = Object.keys(deviceCounts).length > 0 ? Object.keys(deviceCounts).reduce((a, b) => deviceCounts[a] > deviceCounts[b] ? a : b) : "-";
+            document.getElementById('kpiDevice').innerText = topDevice;
+        }
+
+        // Chart Rendering Engine
+        function renderCharts() {
+            if(filteredData.length === 0) return;
+
+            const countBy = (arr, key) => arr.reduce((acc, obj) => { if(obj[key]) acc[obj[key]] = (acc[obj[key]] || 0) + 1; return acc; }, {});
+            
+            if (currentTab === 'tab-overview') {
+                const courses = countBy(filteredData, 'Course_Track');
+                const sortedCourses = Object.entries(courses).sort((a,b) => b[1] - a[1]);
+                drawChart('courseChart', 'bar', sortedCourses.map(x=>x[0]), sortedCourses.map(x=>x[1]), 'Enrollments', true);
+
+                const satOrder = ["Strongly agree", "Agree", "Neutral", "Disagree", "Strongly disagree"];
+                const sat = countBy(filteredData, 'Rating_Overall_Satisfaction');
+                const sortedSatKeys = Object.keys(sat).sort((a,b) => satOrder.indexOf(a) - satOrder.indexOf(b));
+                
+                // Use semantic colors for satisfaction donut
+                const bgColors = sortedSatKeys.map(key => likertColors[key]);
+                drawChart('satisfactionChart', 'doughnut', sortedSatKeys, sortedSatKeys.map(k=>sat[k]), 'Responses', false, bgColors);
+
+                const monthCounts = {};
+                filteredData.forEach(row => {
+                    const dateObj = new Date(row.Completion_Timestamp);
+                    if (!isNaN(dateObj)) {
+                        const monthYear = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
+                        monthCounts[monthYear] = (monthCounts[monthYear] || 0) + 1;
+                    }
+                });
+                const sortedMonths = Object.keys(monthCounts).sort();
+                const displayMonths = sortedMonths.map(m => {
+                    const [y, mm] = m.split('-');
+                    const date = new Date(y, mm - 1);
+                    return date.toLocaleString('default', { month: 'short', year: 'numeric' });
+                });
+                drawChart('trendChart', 'line', displayMonths, sortedMonths.map(m=>monthCounts[m]), 'Completions');
+            }
+            else if (currentTab === 'tab-demographics') {
+                const sectors = countBy(filteredData, 'Employment_Sector');
+                const sortedSectors = Object.entries(sectors).sort((a,b) => b[1] - a[1]);
+                drawChart('sectorChart', 'bar', sortedSectors.map(x=>x[0]), sortedSectors.map(x=>x[1]), 'Learners', true);
+
+                const regions = countBy(filteredData, 'Region');
+                const sortedRegions = Object.entries(regions).sort((a,b) => b[1] - a[1]);
+                drawChart('regionChart', 'bar', sortedRegions.map(x=>x[0].split(' (')[0]), sortedRegions.map(x=>x[1]), 'Learners');
+
+                const sex = countBy(filteredData, 'Sex');
+                drawChart('sexChart', 'pie', Object.keys(sex), Object.values(sex), 'Learners');
+            }
+            else if (currentTab === 'tab-metrics') {
+                
+                // Draw Massive Likert Matrix Chart
+                drawLikertMatrix();
+
+                const devices = countBy(filteredData, 'Primary_Learning_Device');
+                const sortedDevices = Object.entries(devices).sort((a,b) => b[1] - a[1]);
+                drawChart('deviceChart', 'pie', sortedDevices.map(x=>x[0]), sortedDevices.map(x=>x[1]), 'Users');
+
+                const hours = countBy(filteredData, 'Estimated_Hours_Spent');
+                const hourOrder = ["Under 10 hours", "10-20 hours", "21-30 hours", "31-40 hours", "Over 40 hours"];
+                const sortedHoursKeys = Object.keys(hours).sort((a,b) => hourOrder.indexOf(a) - hourOrder.indexOf(b));
+                drawChart('hoursChart', 'bar', sortedHoursKeys, sortedHoursKeys.map(k => hours[k]), 'Learners', true);
+            }
+        }
+
+        // Special Function for Likert Stacked Bar Matrix
+        function drawLikertMatrix() {
+            if (chartInstances['likertMatrixChart']) {
+                chartInstances['likertMatrixChart'].destroy();
+            }
+
+            const metricKeys = [
+                { id: 'Rating_Platform_Usability', label: '"The platform was easy to navigate."' },
+                { id: 'Rating_Content_Relevance', label: '"The content is relevant to my job."' },
+                { id: 'Rating_Video_Clarity', label: '"The video lectures were clear."' },
+                { id: 'Rating_Overall_Satisfaction', label: '"I am highly satisfied overall."' }
+            ];
+
+            const likertOptions = ["Strongly agree", "Agree", "Neutral", "Disagree", "Strongly disagree"];
+            
+            // Build dataset structure required by Chart.js for stacked bars
+            let datasets = likertOptions.map(option => {
+                return {
+                    label: option,
+                    backgroundColor: likertColors[option],
+                    data: metricKeys.map(metric => {
+                        return filteredData.filter(row => row[metric.id] === option).length;
+                    })
+                };
+            });
+
+            const ctx = document.getElementById('likertMatrixChart').getContext('2d');
+            chartInstances['likertMatrixChart'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: metricKeys.map(m => m.label),
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y', // Horizontal bars are much easier to read for surveys
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        // Standard Chart.js Wrapper
+        function drawChart(canvasId, type, labels, dataPoints, labelName, isHorizontal = false, customColors = null) {
+            if (chartInstances[canvasId]) {
+                chartInstances[canvasId].destroy();
+            }
+
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            
+            let bgColors = customColors ? customColors : colors;
+            if(type === 'line') bgColors = 'rgba(30, 58, 138, 0.1)';
+
+            const config = {
+                type: type,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: labelName,
+                        data: dataPoints,
+                        backgroundColor: bgColors,
+                        borderColor: (type === 'line') ? colors[0] : '#ffffff',
+                        borderWidth: type === 'line' ? 2 : 1,
+                        tension: 0.3,
+                        fill: type === 'line' ? true : false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, 
+                    indexAxis: isHorizontal ? 'y' : 'x',
+                    plugins: { 
+                        legend: { display: ['doughnut', 'pie'].includes(type), position: 'right' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, display: !['doughnut', 'pie'].includes(type) },
+                        x: { display: !['doughnut', 'pie'].includes(type) }
+                    }
+                }
+            };
+
+            chartInstances[canvasId] = new Chart(ctx, config);
+        }
+
+        // Render Qualitative Data Table 
+        function renderTable() {
+            const tbody = document.getElementById('qualitativeTableBody');
+            tbody.innerHTML = '';
+            
+            const displayData = filteredData.slice(0, 100); 
+
+            displayData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="font-medium text-gray-900">${row.Employment_Sector || 'N/A'}</div>
+                        <div class="text-xs text-gray-500">${row.Region || 'N/A'}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-gray-900 font-medium truncate w-48" title="${row.Course_Track || ''}">${row.Course_Track || 'N/A'}</div>
+                    </td>
+                    <td class="px-6 py-4 text-gray-700 italic text-sm">"${row.Qual_Challenges || 'N/A'}"</td>
+                    <td class="px-6 py-4 text-gray-700 text-sm">"${row.Qual_Suggestions || 'N/A'}"</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>
